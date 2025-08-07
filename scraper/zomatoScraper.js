@@ -519,17 +519,13 @@ if (typeof global.File === 'undefined') {
 
 // scraper/zomatoScraper.js
 require('dotenv').config();
-// Use full Puppeteer (bundles Chromium)
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
 const Stealth = require('puppeteer-extra-plugin-stealth');
-const puppeteerExtra = require('puppeteer-extra');
 const cheerio = require('cheerio');
+const path = require('path');
 
-puppeteerExtra.use(Stealth());
+puppeteer.use(Stealth());
 
-// then later, launch with puppeteerExtra:Stealth());
-
-// simple sleep helper
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -544,23 +540,31 @@ async function scrapeByLocation(city, area = '', limit = parseInt(process.env.AR
     : `${normalizedCity}/restaurants`;
   const baseURL = process.env.ZOMATO_BASE_URL;
 
-  const proxyServer = process.env.PROXY || null;
+  const proxyServer = process.env.PROXY;
   console.log(`[DEBUG] Proxy: ${proxyServer || 'No proxy used'}`);
 
   const launchOptions = {
     headless: true,
     args: [
       '--no-sandbox',
-      '--disable-setuid-sandbox'
-    ]
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+    ],
   };
-  if (proxyServer) launchOptions.args.push(`--proxy-server=${proxyServer}`);
-  if (proxyServer) launchOptions.args.push(`--proxy-server=${proxyServer}`);
+
+  if (proxyServer) {
+    launchOptions.args.push(`--proxy-server=${proxyServer}`);
+  }
+
+  // Optional: if you want to override the executable path via env:
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    console.log(`[DEBUG] Using executablePath: ${launchOptions.executablePath}`);
+  }
 
   const browser = await puppeteer.launch(launchOptions);
   const page = await browser.newPage();
 
-  // Spoof user agent and viewport
   await page.setUserAgent(
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
     'AppleWebKit/537.36 (KHTML, like Gecko) ' +
@@ -571,7 +575,6 @@ async function scrapeByLocation(city, area = '', limit = parseInt(process.env.AR
   const allLinks = new Set();
   const t0 = Date.now();
 
-  // Iterate through categories: default, delivery (1), cafes (3)
   for (const cat of [null, 1, 3]) {
     let url = `${baseURL}/${locationPath}`;
     if (cat) url += `?category=${cat}`;
@@ -598,22 +601,26 @@ async function scrapeByLocation(city, area = '', limit = parseInt(process.env.AR
         const href = $(el).attr('href');
         if (!href) return;
         if (cat === 1) {
-          if (/(order|menu|restaurant)/.test(href)) allLinks.add(baseURL + href);
-        } else {
-          if (href.includes(`/${normalizedCity}/`) && href.includes('/info')) allLinks.add(baseURL + href);
+          if (/(order|menu|restaurant)/.test(href)) {
+            allLinks.add(baseURL + href);
+          }
+        } else if (href.includes(`/${normalizedCity}/`) && href.includes('/info')) {
+          allLinks.add(baseURL + href);
         }
       });
 
       console.log(`[CAT ${cat || 'default'}] Links collected: ${allLinks.size}`);
       if (allLinks.size >= limit) break;
-      if (allLinks.size === before) {
-        stagnant++;
-        if (stagnant >= 5) {
-          console.log('[WARN] No new links; moving to next category');
-          break;
-        }
-      } else stagnant = 0;
+
+      if (allLinks.size === before) stagnant++;
+      else stagnant = 0;
+
+      if (stagnant >= 5) {
+        console.log('[WARN] No new links; moving to next category');
+        break;
+      }
     }
+
     if (allLinks.size >= limit) {
       console.log('[✅] Global limit reached');
       break;
@@ -621,10 +628,9 @@ async function scrapeByLocation(city, area = '', limit = parseInt(process.env.AR
   }
 
   await browser.close();
-  console.log(`[INFO] Collected ${allLinks.size} links in ${((Date.now() - t0) / 1000).toFixed(2)}s`);
+  console.log(`[INFO] Collected ${allLinks.size} links in ${((Date.now() - t0)/1000).toFixed(2)}s`);
 
   return Array.from(allLinks).slice(0, limit);
 }
 
 module.exports = { scrapeByLocation };
-
