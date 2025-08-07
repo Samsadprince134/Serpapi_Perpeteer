@@ -511,6 +511,7 @@
 
 
 // Polyfill File for undici
+// Polyfill File for undici
 if (typeof global.File === 'undefined') {
   global.File = class File extends Object {};
 }
@@ -547,9 +548,9 @@ async function scrapeByLocation(city, area = '', limit = parseInt(process.env.AR
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox'
-    ],
-    executablePath: executablePath()
+    ]
   };
+  if (proxyServer) launchOptions.args.push(`--proxy-server=${proxyServer}`);
   if (proxyServer) launchOptions.args.push(`--proxy-server=${proxyServer}`);
 
   const browser = await puppeteer.launch(launchOptions);
@@ -622,4 +623,3 @@ async function scrapeByLocation(city, area = '', limit = parseInt(process.env.AR
 }
 
 module.exports = { scrapeByLocation };
-
