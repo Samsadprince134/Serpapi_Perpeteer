@@ -512,18 +512,22 @@
 
 // Polyfill File for undici
 // Polyfill File for undici
+// Polyfill File for undici
 if (typeof global.File === 'undefined') {
   global.File = class File extends Object {};
 }
 
 // scraper/zomatoScraper.js
 require('dotenv').config();
-const puppeteer = require('puppeteer-extra');
+// Use full Puppeteer (bundles Chromium)
+const puppeteer = require('puppeteer');
 const Stealth = require('puppeteer-extra-plugin-stealth');
+const puppeteerExtra = require('puppeteer-extra');
 const cheerio = require('cheerio');
-const { executablePath } = require('puppeteer');
 
-puppeteer.use(Stealth());
+puppeteerExtra.use(Stealth());
+
+// then later, launch with puppeteerExtra:Stealth());
 
 // simple sleep helper
 function sleep(ms) {
@@ -623,3 +627,4 @@ async function scrapeByLocation(city, area = '', limit = parseInt(process.env.AR
 }
 
 module.exports = { scrapeByLocation };
+
